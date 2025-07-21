@@ -44,27 +44,46 @@ const getTextFromPdf = (file) => {
             pdfjsLib.getDocument(typedarray).promise.then(pdf => {
                 const numPages = pdf.numPages;
                 let pagePromises = [];
-                // Itera por todas as páginas do PDF
                 for (let i = 1; i <= numPages; i++) {
                     pagePromises.push(
-                        pdf.getPage(i).then(page => {
-                            return page.getTextContent();
-                        }).then(textContent => {
-                            // Junta todos os pedaços de texto da página
-                            return textContent.items.map(item => item.str).join(' ');
-                        })
+                        pdf.getPage(i).then(page => page.getTextContent())
+                        .then(textContent => textContent.items.map(item => item.str).join(' '))
                     );
                 }
-                // Quando todas as páginas forem processadas, junta o texto de todas elas
-                Promise.all(pagePromises).then(pageTexts => {
-                    resolve(pageTexts.join('\n\n'));
-                });
+                Promise.all(pagePromises).then(pageTexts => resolve(pageTexts.join('\n\n')));
             }).catch(reject);
         };
         reader.onerror = reject;
         reader.readAsArrayBuffer(file);
     });
 };
+
+/**
+ * Limpa o texto extraído do PDF, removendo cabeçalhos, rodapés e outros ruídos.
+ * @param {string} rawText O texto bruto extraído do PDF.
+ * @returns {string} O texto limpo e pronto para ser enviado à IA.
+ */
+const cleanExtractedText = (rawText) => {
+    // Expressões regulares para identificar e remover linhas indesejadas
+    const patternsToRemove = [
+        /PVLE\.\d{3}\.\d{6}\s-\sVersão\s\d\.\d/g, // Remove a linha do código do laudo, ex: PVLE.007.853883 - Versão 1.0
+        /\$\w+_\d+\$/g, // Remove placeholders como $INITIAL_1$
+        /Rub\d+/g, // Remove placeholders como Rub01, Rub02...
+        /^\s*\d+\s*\/\s*\d+\s*$/gm, // Remove linhas que contêm apenas a paginação (ex: " 1 / 28 ")
+        /Assinaturas[\s\S]*/g // Remove o bloco de assinaturas do final
+    ];
+
+    let cleanedText = rawText;
+    patternsToRemove.forEach(pattern => {
+        cleanedText = cleanedText.replace(pattern, '');
+    });
+
+    // Remove linhas em branco excessivas, deixando no máximo uma.
+    cleanedText = cleanedText.replace(/(\r\n|\n|\r){2,}/g, '\n\n');
+
+    return cleanedText.trim();
+};
+
 
 /**
  * Controla o estado da UI durante o carregamento.
@@ -82,18 +101,12 @@ const setLoadingState = (isLoading, message = '') => {
 };
 
 // --- EVENT LISTENERS ---
-
-// Atualiza o nome do arquivo na UI quando um arquivo é selecionado
 pdfEntradaInput.addEventListener('change', () => updateFileName(pdfEntradaInput, filenameEntrada));
 pdfSaidaInput.addEventListener('change', () => updateFileName(pdfSaidaInput, filenameSaida));
 
-// Listener principal para o envio do formulário
 form.addEventListener('submit', async (event) => {
-    event.preventDefault(); // Impede o recarregamento da página
+    event.preventDefault();
 
-    // ==================================================================
-    //  IMPORTANTE: Cole a URL do seu Webhook do Make.com aqui
-    // ==================================================================
     const webhookURL = 'https://hook.us2.make.com/rnqg54xd3dkkj5axtlr2cwi45do9nv5s';
 
     const fileEntrada = pdfEntradaInput.files[0];
@@ -108,15 +121,22 @@ form.addEventListener('submit', async (event) => {
     resultadoContainer.classList.add('hidden');
 
     try {
-        // Extrai o texto dos dois arquivos em paralelo para otimizar o tempo
-        const [textoEntrada, textoSaida] = await Promise.all([
+        const [rawTextoEntrada, rawTextoSaida] = await Promise.all([
             getTextFromPdf(fileEntrada),
             getTextFromPdf(fileSaida)
         ]);
         
+        setLoadingState(true, 'Limpando textos...');
+
+        // Limpa os textos extraídos antes de enviar
+        const textoEntrada = cleanExtractedText(rawTextoEntrada);
+        const textoSaida = cleanExtractedText(rawTextoSaida);
+
+        console.log("--- TEXTO LIMPO (ENTRADA) ---", textoEntrada); // Para depuração
+        console.log("--- TEXTO LIMPO (SAÍDA) ---", textoSaida); // Para depuração
+
         setLoadingState(true, 'Analisando...');
 
-        // Envia os textos extraídos para o Webhook do Make.com
         const response = await fetch(webhookURL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -126,30 +146,24 @@ form.addEventListener('submit', async (event) => {
             })
         });
 
-        // --- INÍCIO DO NOVO CÓDIGO DE DEPURAÇÃO ---
         console.log('Resposta do Servidor Recebida!');
         console.log(`Status: ${response.status} - ${response.statusText}`);
-        console.log('Cabeçalhos da Resposta:', Object.fromEntries(response.headers.entries()));
-
+        
         const responseBody = await response.text();
         console.log('Corpo da Resposta (texto puro):', responseBody);
-        // --- FIM DO NOVO CÓDIGO DE DEPURAÇÃO ---
 
         if (!response.ok) {
-            // Cria um erro mais detalhado com o corpo da resposta
             throw new Error(`O servidor respondeu com um erro ${response.status}. Corpo da resposta: ${responseBody}`);
         }
         
-        // Usa a biblioteca 'marked' para converter a resposta (em Markdown) para HTML
         resultadoDiv.innerHTML = marked.parse(responseBody);
         resultadoContainer.classList.remove('hidden');
 
     } catch (error) {
         console.error('Ocorreu um erro no processo de análise:', error);
-        resultadoDiv.innerHTML = `<p class="text-red-500 text-center"><b>Falha na Análise.</b><br>Ocorreu um erro ao processar sua solicitação. Abra o console (F12) para ver os detalhes técnicos e verifique a configuração do seu cenário no Make.com.</p>`;
+        resultadoDiv.innerHTML = `<p class="text-red-500 text-center"><b>Falha na Análise.</b><br>Ocorreu um erro ao processar sua solicitação. Abra o console (F12) para ver os detalhes técnicos.</p>`;
         resultadoContainer.classList.remove('hidden');
     } finally {
-        // Restaura o estado do botão
         setLoadingState(false);
     }
 });
