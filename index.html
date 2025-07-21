@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IA para Análise de Vistorias | Imobiliária</title>
+    
+    <!-- Tailwind CSS (Framework de Estilo) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Sua Folha de Estilo Personalizada -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Bibliotecas JavaScript (serão usadas pelo script.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen flex items-center justify-center p-4">
+
+    <main class="w-full max-w-4xl bg-white dark:bg-gray-800 shadow-2xl rounded-2xl p-6 md:p-10">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-400">Analisador de Vistorias com IA</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Faça o upload dos laudos de entrada e saída em PDF para comparar.</p>
+        </div>
+
+        <form id="form-vistoria">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Upload Vistoria de Entrada -->
+                <div>
+                    <label class="block text-lg font-semibold mb-2">Vistoria de ENTRADA</label>
+                    <label for="pdf-entrada" class="file-input-label flex flex-col items-center justify-center w-full h-32 rounded-lg cursor-pointer dark:bg-gray-700 dark:hover:bg-gray-600 dark:border-gray-500 dark:hover:border-gray-400">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4V6a4 4 0 014-4h1.586A2 2 0 0114.172 3.414l.707.707A2 2 0 0016.586 5H20a2 2 0 012 2v10a2 2 0 01-2 2H9.414A2 2 0 018 17.414l-1-1z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <p id="filename-entrada" class="mb-2 text-sm text-gray-500 dark:text-gray-400 text-center"><span class="font-semibold">Clique para escolher</span> ou arraste</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">PDF (MAX. 10MB)</p>
+                        </div>
+                        <input id="pdf-entrada" type="file" class="hidden" accept="application/pdf" />
+                    </label>
+                </div>
+                <!-- Upload Vistoria de Saída -->
+                <div>
+                    <label class="block text-lg font-semibold mb-2">Vistoria de SAÍDA</label>
+                     <label for="pdf-saida" class="file-input-label flex flex-col items-center justify-center w-full h-32 rounded-lg cursor-pointer dark:bg-gray-700 dark:hover:bg-gray-600 dark:border-gray-500 dark:hover:border-gray-400">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4V6a4 4 0 014-4h1.586A2 2 0 0114.172 3.414l.707.707A2 2 0 0016.586 5H20a2 2 0 012 2v10a2 2 0 01-2 2H9.414A2 2 0 018 17.414l-1-1z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <p id="filename-saida" class="mb-2 text-sm text-gray-500 dark:text-gray-400 text-center"><span class="font-semibold">Clique para escolher</span> ou arraste</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">PDF (MAX. 10MB)</p>
+                        </div>
+                        <input id="pdf-saida" type="file" class="hidden" accept="application/pdf" />
+                    </label>
+                </div>
+            </div>
+
+            <div class="mt-8 text-center">
+                <button type="submit" id="btn-analisar" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center mx-auto">
+                    <span id="btn-text">Analisar e Comparar</span>
+                    <div id="loading-spinner" class="spinner w-6 h-6 rounded-full border-4 border-t-4 border-gray-200 ml-3 hidden"></div>
+                </button>
+            </div>
+        </form>
+
+        <div id="resultado-container" class="mt-10 pt-6 border-t-2 border-gray-200 dark:border-gray-700 hidden">
+             <h2 class="text-2xl md:text-3xl font-bold text-center mb-6">Resultado da Análise</h2>
+             <div id="resultado" class="prose dark:prose-invert max-w-none p-4 bg-gray-50 dark:bg-gray-900 rounded-lg"></div>
+        </div>
+    </main>
+
+    <!-- Seu Script Personalizado -->
+    <script src="script.js"></script>
+</body>
+</html>
