@@ -96,11 +96,6 @@ form.addEventListener('submit', async (event) => {
     // ==================================================================
     const webhookURL = 'https://hook.us2.make.com/rnqg54xd3dkkj5axtlr2cwi45do9nv5s';
 
-    if (webhookURL === 'https://hook.us2.make.com/rnqg54xd3dkkj5axtlr2cwi45do9nv5s') {
-        alert('ERRO: Você precisa configurar a URL do Webhook no arquivo script.js!');
-        return;
-    }
-
     const fileEntrada = pdfEntradaInput.files[0];
     const fileSaida = pdfSaidaInput.files[0];
 
@@ -131,18 +126,27 @@ form.addEventListener('submit', async (event) => {
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`Erro na comunicação com o servidor: ${response.statusText}`);
-        }
+        // --- INÍCIO DO NOVO CÓDIGO DE DEPURAÇÃO ---
+        console.log('Resposta do Servidor Recebida!');
+        console.log(`Status: ${response.status} - ${response.statusText}`);
+        console.log('Cabeçalhos da Resposta:', Object.fromEntries(response.headers.entries()));
 
-        const analiseMarkdown = await response.text();
+        const responseBody = await response.text();
+        console.log('Corpo da Resposta (texto puro):', responseBody);
+        // --- FIM DO NOVO CÓDIGO DE DEPURAÇÃO ---
+
+        if (!response.ok) {
+            // Cria um erro mais detalhado com o corpo da resposta
+            throw new Error(`O servidor respondeu com um erro ${response.status}. Corpo da resposta: ${responseBody}`);
+        }
+        
         // Usa a biblioteca 'marked' para converter a resposta (em Markdown) para HTML
-        resultadoDiv.innerHTML = marked.parse(analiseMarkdown);
+        resultadoDiv.innerHTML = marked.parse(responseBody);
         resultadoContainer.classList.remove('hidden');
 
     } catch (error) {
-        console.error('Ocorreu um erro:', error);
-        resultadoDiv.innerHTML = `<p class="text-red-500 text-center"><b>Falha na Análise.</b><br>Ocorreu um erro ao processar sua solicitação. Verifique se os PDFs não estão protegidos ou corrompidos e tente novamente.</p>`;
+        console.error('Ocorreu um erro no processo de análise:', error);
+        resultadoDiv.innerHTML = `<p class="text-red-500 text-center"><b>Falha na Análise.</b><br>Ocorreu um erro ao processar sua solicitação. Abra o console (F12) para ver os detalhes técnicos e verifique a configuração do seu cenário no Make.com.</p>`;
         resultadoContainer.classList.remove('hidden');
     } finally {
         // Restaura o estado do botão
